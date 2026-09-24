@@ -19,7 +19,7 @@
         .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; display: inline-block; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
-    <!-- Script estável do Three.js -->
+    <!-- Importação externa segura via CDN estável -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -48,20 +48,23 @@
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
 
-        // Câmera posicionada com folga para evitar clipping interno
+        // Câmera com FOV e profundidade otimizados
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 2, 12);
         camera.lookAt(0, 0, 0);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        // AJUSTE MOBILE: Inicialização forçando alto desempenho em GPUs móveis
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
         
-        // CORREÇÃO: Força o fundo a clarear um pouco para provar que o canvas iniciou
+        // AJUSTE MOBILE: Limita o multiplicador de pixels em telas de alta densidade (evita sobrecarga e tela preta)
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        
+        // Fundo militar translúcido visível para atestar o funcionamento do canvas
         renderer.setClearColor(0x0c1a0c, 1); 
         container.appendChild(renderer.domElement);
 
-        // Iluminação robusta para evitar silhuetas pretas
+        // Iluminação geral tridimensional
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
         
@@ -69,7 +72,7 @@
         dirLight.position.set(5, 10, 7);
         scene.add(dirLight);
 
-        // Geometria Central (Núcleo do Reator)
+        // Estrutura Central (Reator)
         const coreGeo = new THREE.CylinderGeometry(2, 2, 5, 16, 1, true);
         const coreMat = new THREE.MeshBasicMaterial({ 
             color: 0x00ff66, 
@@ -80,41 +83,39 @@
         const reactorCore = new THREE.Mesh(coreGeo, coreMat);
         scene.add(reactorCore);
 
-        // Anel de Energia
+        // Anel do Reator
         const ringGeo = new THREE.RingGeometry(2.3, 2.5, 32);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
         const ring1 = new THREE.Mesh(ringGeo, ringMat);
         ring1.rotation.x = Math.PI / 2;
         scene.add(ring1);
 
-        // CONFIGURAÇÃO SEGURA DE FLUXO MOLECULAR (Substituindo Points por Malhas Reais)
-        const particleCount = 60;
+        // Gerenciamento Estável de Moléculas 3D Reais
+        const particleCount = 45; // Quantidade otimizada para navegadores mobile
         const molecules = [];
         
-        // Três materiais geométricos puros e seguros
         const matCO2 = new THREE.MeshBasicMaterial({ color: 0xff3333 });
         const matO2 = new THREE.MeshBasicMaterial({ color: 0x3399ff });
         const matC = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
-        const sphereGeo = new THREE.SphereGeometry(0.15, 8, 8); // Esferas leves de baixa resolução
+        const sphereGeo = new THREE.SphereGeometry(0.15, 6, 6); // Malhas ultra leves de carregamento garantido
 
         function initMolecule(mesh) {
             mesh.position.x = (Math.random() - 0.5) * 3.5;
             mesh.position.y = Math.random() * 4 + 3;
             mesh.position.z = (Math.random() - 0.5) * 3.5;
             mesh.material = matCO2;
-            mesh.userData = { type: 0, speed: 0.03 + Math.random() * 0.03 };
+            mesh.userData = { type: 0, speed: 0.02 + Math.random() * 0.03 };
         }
 
         for (let i = 0; i < particleCount; i++) {
             const molMesh = new THREE.Mesh(sphereGeo, matCO2);
             initMolecule(molMesh);
-            // Espalhar a altura inicial uniformemente
-            molMesh.position.y = Math.random() * 7 - 2;
+            molMesh.position.y = Math.random() * 7 - 2; // Distribuição inicial randômica na tela
             scene.add(molMesh);
             molecules.push(molMesh);
         }
 
-        // Variáveis HUD
+        // Dados do Painel
         let co2Lvl = 450;
         let o2Lvl = 21.0;
         let cGrams = 0.00;
@@ -123,39 +124,37 @@
         const o2El = document.getElementById('o2-val');
         const cEl = document.getElementById('c-val');
 
-        // Loop Principal
+        // Loop de Renderização e Simulação Físico-Química
         function animate() {
             requestAnimationFrame(animate);
 
-            // Animação das estruturas do Reator
-            reactorCore.rotation.y += 0.006;
+            reactorCore.rotation.y += 0.005;
             ring1.position.y = Math.sin(Date.now() * 0.002) * 0.4;
 
-            // Processamento do movimento molecular individual
             molecules.forEach(mol => {
                 mol.position.y -= mol.userData.speed;
 
-                // Reação ao cruzar o plano central do reator
+                // Transmutação molecular na barreira elétrica do núcleo
                 if (mol.userData.type === 0 && mol.position.y <= 0.6 && mol.position.y >= -0.6) {
                     if (Math.random() > 0.4) {
-                        mol.userData.type = 1; // Transforma em Oxigênio (Azul)
+                        mol.userData.type = 1; // Oxigênio (Azul)
                         mol.material = matO2;
                         o2Lvl = Math.min(25.0, o2Lvl + 0.008);
                         if (co2Lvl > 100) co2Lvl -= 1;
                     } else {
-                        mol.userData.type = 2; // Transforma em Carbono (Cinza)
+                        mol.userData.type = 2; // Carbono Sólido (Cinza)
                         mol.material = matC;
                         cGrams += 0.02;
                     }
                 }
 
-                // Reinicia a molécula se ela passar do limite inferior
+                // Reciclagem da molécula ao sair do campo inferior
                 if (mol.position.y < -5) {
                     initMolecule(mol);
                 }
             });
 
-            // Atualização do texto do painel
+            // Atualização contínua de Telemetria Textual
             co2El.innerText = Math.floor(co2Lvl) + " PPM";
             o2El.innerText = o2Lvl.toFixed(1) + "%";
             cEl.innerText = cGrams.toFixed(2) + "g";
@@ -163,7 +162,7 @@
             renderer.render(scene, camera);
         }
 
-        // Evento do botão HUD
+        // Clique do Botão Injetar
         document.getElementById('trigger-pulse').addEventListener('click', () => {
             co2Lvl += 60;
             molecules.forEach(mol => {
@@ -173,7 +172,7 @@
             });
         });
 
-        // Ajuste de Janela Dinâmico
+        // Responsividade para alteração de orientação (Retrato / Paisagem no Celular)
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
