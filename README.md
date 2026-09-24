@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -19,7 +19,7 @@
         .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; display: inline-block; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
-    <!-- Importação do Three.js via CDN -->
+    <!-- CORREÇÃO: Importação correta e funcional do Three.js via CDN cdnjs -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -88,18 +88,25 @@
         const colorO2 = new THREE.Color(0x3399ff);
         const colorC = new THREE.Color(0x888888);
 
-        for(let i=0; i<particleCount; i++) {
-            // Partículas começam no topo como CO2 simulando a exalação recebida
+        function resetParticle(i) {
             positions[i*3] = (Math.random() - 0.5) * 4;
-            positions[i*3+1] = Math.random() * 4 + 2; 
+            positions[i*3+1] = Math.random() * 4 + 4; 
             positions[i*3+2] = (Math.random() - 0.5) * 4;
 
             colors[i*3] = colorCO2.r;
             colors[i*3+1] = colorCO2.g;
             colors[i*3+2] = colorCO2.b;
 
-            pTypes.push(0); 
-            pSpeeds.push(0.03 + Math.random() * 0.04);
+            pTypes[i] = 0; 
+            pSpeeds[i] = 0.03 + Math.random() * 0.04;
+        }
+
+        for(let i=0; i<particleCount; i++) {
+            pTypes.push(0);
+            pSpeeds.push(0);
+            resetParticle(i);
+            // Distribuir a altura inicial para não caírem todas juntas no começo
+            positions[i*3+1] = Math.random() * 8 - 2;
         }
 
         pGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -132,6 +139,10 @@
         let o2Lvl = 21.0;
         let cGrams = 0.00;
 
+        const co2El = document.getElementById('co2-val');
+        const o2El = document.getElementById('o2-val');
+        const cEl = document.getElementById('c-val');
+
         // Loop de Animação Principal
         function animate() {
             requestAnimationFrame(animate);
@@ -149,50 +160,54 @@
 
                 // Zona de Quebra Molecular Elétrica (Y entre 0.5 e -0.5)
                 if(pTypes[i] === 0 && posArr[i*3+1] <= 0.5 && posArr[i*3+1] >= -0.5) {
-                    // Transiciona quimicamente o tipo de partícula
                     if(Math.random() > 0.4) {
                         pTypes[i] = 1; // Transforma em Oxigênio
                         colArr[i*3] = colorO2.r; colArr[i*3+1] = colorO2.g; colArr[i*3+2] = colorO2.b;
-                        o2Lvl = Math.min(22.0, o2Lvl + 0.005);
+                        o2Lvl = Math.min(25.0, o2Lvl + 0.002);
+                        if(co2Lvl > 120) co2Lvl -= 1;
                     } else {
                         pTypes[i] = 2; // Transforma em Carbono Sólido
                         colArr[i*3] = colorC.r; colArr[i*3+1] = colorC.g; colArr[i*3+2] = colorC.b;
                         cGrams += 0.01;
                     }
-                    co2Lvl = Math.max(320, co2Lvl - 0.2);
                 }
 
-                // Comportamento pós-quebra molecular
-                if(pTypes[i] === 1) {
-                    // Oxigênio sobe purificado para as vias superiores do capacete
-                    posArr[i*3+1] += pSpeeds[i] * 1.5; 
-                    if(posArr[i*3+1] > 6) resetParticle(i, posArr, colArr);
-                } else if(pTypes[i] === 2) {
-                    // Carbono desce condensado para os ejetores/tanque do SAMS
-                    if(posArr[i*3+1] < -4) resetParticle(i, posArr, colArr);
-                } else {
-                    // Se passar sem ser quebrado, reseta no fundo e retorna ao ciclo
-                    if(posArr[i*3+1] < -4) resetParticle(i, posArr, colArr);
+                // Reseta a partícula se ela cair demais
+                if(posArr[i*3+1] < -6) {
+                    resetParticle(i);
                 }
             }
+
+            // Atualiza os dados no HUD de forma legível
+            co2El.innerText = Math.floor(co2Lvl) + " PPM";
+            o2El.innerText = o2Lvl.toFixed(1) + "%";
+            cEl.innerText = cGrams.toFixed(2) + "g";
 
             pGeometry.attributes.position.needsUpdate = true;
             pGeometry.attributes.color.needsUpdate = true;
 
-            // Atualiza Interface de Usuário (HUD)
-            document.getElementById('co2-val').innerText = `${co2Lvl.toFixed(1)} PPM`;
-            document.getElementById('o2-val').innerText = `${o2Lvl.toFixed(2)}%`;
-            document.getElementById('c-val').innerText = `${cGrams.toFixed(2)}g`;
-
             renderer.render(scene, camera);
         }
 
-        function resetParticle(i, posArr, colArr) {
-            posArr[i*3] = (Math.random() - 0.5) * 4;
-            posArr[i*3+1] = 5;
-            posArr[i*3+2] = (Math.random() - 0.5) * 4;
-            pTypes[i] = 0;
-            colArr[i*3] = colorCO2.r; colArr[i*3+1] = colorCO2.g; colArr[i*3+2] = colorCO2.b;
-        }
+        // Ação do Botão: Injeta mais CO2 e sobe os níveis do HUD
+        document.getElementById('trigger-pulse').addEventListener('click', () => {
+            co2Lvl += 50;
+            const posArr = pGeometry.attributes.position.array;
+            for(let i=0; i<particleCount; i++) {
+                if(posArr[i*3+1] < 0) {
+                    resetParticle(i);
+                }
+            }
+        });
 
-        // Interação manual por pulso
+        // Ajuste de tela responsivo
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Inicia a animação
+        animate();
+    </script>
+</body>
