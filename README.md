@@ -19,7 +19,7 @@
         .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; display: inline-block; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
-    <!-- CORREÇÃO: Importação correta e funcional do Three.js via CDN cdnjs -->
+    <!-- Utilização da CDN estável do cdnjs para o Three.js -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -45,7 +45,6 @@
     <button class="btn-action" id="trigger-pulse">INJETAR FLUXO CO₂</button>
 
     <script>
-        // Configuração Inicial da Cena Three.js
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x050b05, 0.05);
@@ -58,7 +57,11 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         container.appendChild(renderer.domElement);
 
-        // Geometria Central: Núcleo do Reator Eletroquímico
+        // Iluminação base para evitar renderizações completamente escuras
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        // Geometria Central
         const coreGeo = new THREE.CylinderGeometry(2, 2, 4, 32, 1, true);
         const coreMat = new THREE.MeshBasicMaterial({ 
             color: 0x00ff66, 
@@ -69,24 +72,24 @@
         const reactorCore = new THREE.Mesh(coreGeo, coreMat);
         scene.add(reactorCore);
 
-        // Anéis de Energia do Reator
+        // Anéis de Energia
         const ringGeo = new THREE.RingGeometry(2.2, 2.4, 32);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
         const ring1 = new THREE.Mesh(ringGeo, ringMat);
         ring1.rotation.x = Math.PI / 2;
         scene.add(ring1);
 
-        // Gerenciamento de Partículas (CO2, O2, Carbono)
+        // Gerenciamento de Partículas Seguro
         const particleCount = 200;
         const pGeometry = new THREE.BufferGeometry();
         const positions = new Float32Array(particleCount * 3);
         const colors = new Float32Array(particleCount * 3);
-        const pTypes = []; // 0: CO2, 1: O2, 2: Carbono
-        const pSpeeds = [];
+        const pTypes = new Int8Array(particleCount); // 0: CO2, 1: O2, 2: Carbono
+        const pSpeeds = new Float32Array(particleCount);
 
-        const colorCO2 = new THREE.Color(0xff3333);
-        const colorO2 = new THREE.Color(0x3399ff);
-        const colorC = new THREE.Color(0x888888);
+        const colorCO2 = { r: 1.0, g: 0.2, b: 0.2 };
+        const colorO2 = { r: 0.2, g: 0.6, b: 1.0 };
+        const colorC = { r: 0.5, g: 0.5, b: 0.5 };
 
         function resetParticle(i) {
             positions[i*3] = (Math.random() - 0.5) * 4;
@@ -102,39 +105,24 @@
         }
 
         for(let i=0; i<particleCount; i++) {
-            pTypes.push(0);
-            pSpeeds.push(0);
             resetParticle(i);
-            // Distribuir a altura inicial para não caírem todas juntas no começo
-            positions[i*3+1] = Math.random() * 8 - 2;
+            positions[i*3+1] = Math.random() * 8 - 2; // Distribui no início
         }
 
         pGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         pGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-        // Textura simulada por Canvas para partículas redondas limpas
-        const pCanvas = document.createElement('canvas');
-        pCanvas.width = 16; pCanvas.height = 16;
-        const pCtx = pCanvas.getContext('2d');
-        let grad = pCtx.createRadialGradient(8,8,0, 8,8,8);
-        grad.addColorStop(0, 'rgba(255,255,255,1)');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
-        pCtx.fillStyle = grad; pCtx.fillRect(0,0,16,16);
-        const pTex = new THREE.CanvasTexture(pCanvas);
-
+        // Substituição por método nativo estável (Material de Pontos com Vertex Colors)
         const pMaterial = new THREE.PointsMaterial({
-            size: 0.35,
-            map: pTex,
+            size: 0.25,
             transparent: true,
-            blending: THREE.AdditiveBlending,
-            vertexColors: true,
-            depthWrite: false
+            opacity: 0.8,
+            vertexColors: true
         });
 
         const particleSystem = new THREE.Points(pGeometry, pMaterial);
         scene.add(particleSystem);
 
-        // Variáveis de Telemetria Dinâmica do HUD
         let co2Lvl = 450;
         let o2Lvl = 21.0;
         let cGrams = 0.00;
@@ -143,11 +131,9 @@
         const o2El = document.getElementById('o2-val');
         const cEl = document.getElementById('c-val');
 
-        // Loop de Animação Principal
         function animate() {
             requestAnimationFrame(animate);
 
-            // Rotação dos elementos estáticos do reator
             reactorCore.rotation.y += 0.005;
             ring1.position.y = Math.sin(Date.now() * 0.002) * 0.5;
 
@@ -155,59 +141,62 @@
             const colArr = pGeometry.attributes.color.array;
 
             for(let i=0; i<particleCount; i++) {
-                // Movimento descendente em direção ao centro do reator
                 posArr[i*3+1] -= pSpeeds[i];
 
-                // Zona de Quebra Molecular Elétrica (Y entre 0.5 e -0.5)
+                // Reação na zona do núcleo
                 if(pTypes[i] === 0 && posArr[i*3+1] <= 0.5 && posArr[i*3+1] >= -0.5) {
                     if(Math.random() > 0.4) {
-                        pTypes[i] = 1; // Transforma em Oxigênio
-                        colArr[i*3] = colorO2.r; colArr[i*3+1] = colorO2.g; colArr[i*3+2] = colorO2.b;
+                        pTypes[i] = 1; // Oxigênio
+                        colArr[i*3] = colorO2.r; 
+                        colArr[i*3+1] = colorO2.g; 
+                        colArr[i*3+2] = colorO2.b;
                         o2Lvl = Math.min(25.0, o2Lvl + 0.002);
-                        if(co2Lvl > 120) co2Lvl -= 1;
+                        if(co2Lvl > 120) co2Lvl -= 0.5;
                     } else {
-                        pTypes[i] = 2; // Transforma em Carbono Sólido
-                        colArr[i*3] = colorC.r; colArr[i*3+1] = colorC.g; colArr[i*3+2] = colorC.b;
-                        cGrams += 0.01;
+                        pTypes[i] = 2; // Carbono
+                        colArr[i*3] = colorC.r; 
+                        colArr[i*3+1] = colorC.g; 
+                        colArr[i*3+2] = colorC.b;
+                        cGrams += 0.005;
                     }
+                    pGeometry.attributes.color.needsUpdate = true;
                 }
 
-                // Reseta a partícula se ela cair demais
                 if(posArr[i*3+1] < -6) {
                     resetParticle(i);
+                    // Atualiza a cor de volta para CO2 ao resetar
+                    colArr[i*3] = colorCO2.r; 
+                    colArr[i*3+1] = colorCO2.g; 
+                    colArr[i*3+2] = colorCO2.b;
+                    pGeometry.attributes.color.needsUpdate = true;
                 }
             }
 
-            // Atualiza os dados no HUD de forma legível
             co2El.innerText = Math.floor(co2Lvl) + " PPM";
             o2El.innerText = o2Lvl.toFixed(1) + "%";
             cEl.innerText = cGrams.toFixed(2) + "g";
 
             pGeometry.attributes.position.needsUpdate = true;
-            pGeometry.attributes.color.needsUpdate = true;
 
             renderer.render(scene, camera);
         }
 
-        // Ação do Botão: Injeta mais CO2 e sobe os níveis do HUD
         document.getElementById('trigger-pulse').addEventListener('click', () => {
             co2Lvl += 50;
-            const posArr = pGeometry.attributes.position.array;
             for(let i=0; i<particleCount; i++) {
-                if(posArr[i*3+1] < 0) {
+                if(positions[i*3+1] < 0) {
                     resetParticle(i);
                 }
             }
         });
 
-        // Ajuste de tela responsivo
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Inicia a animação
         animate();
     </script>
 </body>
+</html>
