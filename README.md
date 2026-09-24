@@ -19,7 +19,7 @@
         .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; display: inline-block; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
-    <!-- Utilização da CDN estável do cdnjs para o Three.js -->
+    <!-- Script estável do Three.js -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -47,82 +47,74 @@
     <script>
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x050b05, 0.05);
 
+        // Câmera posicionada com folga para evitar clipping interno
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 0, 15);
+        camera.position.set(0, 2, 12);
+        camera.lookAt(0, 0, 0);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
+        
+        // CORREÇÃO: Força o fundo a clarear um pouco para provar que o canvas iniciou
+        renderer.setClearColor(0x0c1a0c, 1); 
         container.appendChild(renderer.domElement);
 
-        // Iluminação base para evitar renderizações completamente escuras
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        // Iluminação robusta para evitar silhuetas pretas
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
 
-        // Geometria Central
-        const coreGeo = new THREE.CylinderGeometry(2, 2, 4, 32, 1, true);
+        // Geometria Central (Núcleo do Reator)
+        const coreGeo = new THREE.CylinderGeometry(2, 2, 5, 16, 1, true);
         const coreMat = new THREE.MeshBasicMaterial({ 
             color: 0x00ff66, 
             wireframe: true, 
             transparent: true, 
-            opacity: 0.25 
+            opacity: 0.3 
         });
         const reactorCore = new THREE.Mesh(coreGeo, coreMat);
         scene.add(reactorCore);
 
-        // Anéis de Energia
-        const ringGeo = new THREE.RingGeometry(2.2, 2.4, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+        // Anel de Energia
+        const ringGeo = new THREE.RingGeometry(2.3, 2.5, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
         const ring1 = new THREE.Mesh(ringGeo, ringMat);
         ring1.rotation.x = Math.PI / 2;
         scene.add(ring1);
 
-        // Gerenciamento de Partículas Seguro
-        const particleCount = 200;
-        const pGeometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(particleCount * 3);
-        const colors = new Float32Array(particleCount * 3);
-        const pTypes = new Int8Array(particleCount); // 0: CO2, 1: O2, 2: Carbono
-        const pSpeeds = new Float32Array(particleCount);
+        // CONFIGURAÇÃO SEGURA DE FLUXO MOLECULAR (Substituindo Points por Malhas Reais)
+        const particleCount = 60;
+        const molecules = [];
+        
+        // Três materiais geométricos puros e seguros
+        const matCO2 = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+        const matO2 = new THREE.MeshBasicMaterial({ color: 0x3399ff });
+        const matC = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
+        const sphereGeo = new THREE.SphereGeometry(0.15, 8, 8); // Esferas leves de baixa resolução
 
-        const colorCO2 = { r: 1.0, g: 0.2, b: 0.2 };
-        const colorO2 = { r: 0.2, g: 0.6, b: 1.0 };
-        const colorC = { r: 0.5, g: 0.5, b: 0.5 };
-
-        function resetParticle(i) {
-            positions[i*3] = (Math.random() - 0.5) * 4;
-            positions[i*3+1] = Math.random() * 4 + 4; 
-            positions[i*3+2] = (Math.random() - 0.5) * 4;
-
-            colors[i*3] = colorCO2.r;
-            colors[i*3+1] = colorCO2.g;
-            colors[i*3+2] = colorCO2.b;
-
-            pTypes[i] = 0; 
-            pSpeeds[i] = 0.03 + Math.random() * 0.04;
+        function initMolecule(mesh) {
+            mesh.position.x = (Math.random() - 0.5) * 3.5;
+            mesh.position.y = Math.random() * 4 + 3;
+            mesh.position.z = (Math.random() - 0.5) * 3.5;
+            mesh.material = matCO2;
+            mesh.userData = { type: 0, speed: 0.03 + Math.random() * 0.03 };
         }
 
-        for(let i=0; i<particleCount; i++) {
-            resetParticle(i);
-            positions[i*3+1] = Math.random() * 8 - 2; // Distribui no início
+        for (let i = 0; i < particleCount; i++) {
+            const molMesh = new THREE.Mesh(sphereGeo, matCO2);
+            initMolecule(molMesh);
+            // Espalhar a altura inicial uniformemente
+            molMesh.position.y = Math.random() * 7 - 2;
+            scene.add(molMesh);
+            molecules.push(molMesh);
         }
 
-        pGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        pGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-        // Substituição por método nativo estável (Material de Pontos com Vertex Colors)
-        const pMaterial = new THREE.PointsMaterial({
-            size: 0.25,
-            transparent: true,
-            opacity: 0.8,
-            vertexColors: true
-        });
-
-        const particleSystem = new THREE.Points(pGeometry, pMaterial);
-        scene.add(particleSystem);
-
+        // Variáveis HUD
         let co2Lvl = 450;
         let o2Lvl = 21.0;
         let cGrams = 0.00;
@@ -131,65 +123,57 @@
         const o2El = document.getElementById('o2-val');
         const cEl = document.getElementById('c-val');
 
+        // Loop Principal
         function animate() {
             requestAnimationFrame(animate);
 
-            reactorCore.rotation.y += 0.005;
-            ring1.position.y = Math.sin(Date.now() * 0.002) * 0.5;
+            // Animação das estruturas do Reator
+            reactorCore.rotation.y += 0.006;
+            ring1.position.y = Math.sin(Date.now() * 0.002) * 0.4;
 
-            const posArr = pGeometry.attributes.position.array;
-            const colArr = pGeometry.attributes.color.array;
+            // Processamento do movimento molecular individual
+            molecules.forEach(mol => {
+                mol.position.y -= mol.userData.speed;
 
-            for(let i=0; i<particleCount; i++) {
-                posArr[i*3+1] -= pSpeeds[i];
-
-                // Reação na zona do núcleo
-                if(pTypes[i] === 0 && posArr[i*3+1] <= 0.5 && posArr[i*3+1] >= -0.5) {
-                    if(Math.random() > 0.4) {
-                        pTypes[i] = 1; // Oxigênio
-                        colArr[i*3] = colorO2.r; 
-                        colArr[i*3+1] = colorO2.g; 
-                        colArr[i*3+2] = colorO2.b;
-                        o2Lvl = Math.min(25.0, o2Lvl + 0.002);
-                        if(co2Lvl > 120) co2Lvl -= 0.5;
+                // Reação ao cruzar o plano central do reator
+                if (mol.userData.type === 0 && mol.position.y <= 0.6 && mol.position.y >= -0.6) {
+                    if (Math.random() > 0.4) {
+                        mol.userData.type = 1; // Transforma em Oxigênio (Azul)
+                        mol.material = matO2;
+                        o2Lvl = Math.min(25.0, o2Lvl + 0.008);
+                        if (co2Lvl > 100) co2Lvl -= 1;
                     } else {
-                        pTypes[i] = 2; // Carbono
-                        colArr[i*3] = colorC.r; 
-                        colArr[i*3+1] = colorC.g; 
-                        colArr[i*3+2] = colorC.b;
-                        cGrams += 0.005;
+                        mol.userData.type = 2; // Transforma em Carbono (Cinza)
+                        mol.material = matC;
+                        cGrams += 0.02;
                     }
-                    pGeometry.attributes.color.needsUpdate = true;
                 }
 
-                if(posArr[i*3+1] < -6) {
-                    resetParticle(i);
-                    // Atualiza a cor de volta para CO2 ao resetar
-                    colArr[i*3] = colorCO2.r; 
-                    colArr[i*3+1] = colorCO2.g; 
-                    colArr[i*3+2] = colorCO2.b;
-                    pGeometry.attributes.color.needsUpdate = true;
+                // Reinicia a molécula se ela passar do limite inferior
+                if (mol.position.y < -5) {
+                    initMolecule(mol);
                 }
-            }
+            });
 
+            // Atualização do texto do painel
             co2El.innerText = Math.floor(co2Lvl) + " PPM";
             o2El.innerText = o2Lvl.toFixed(1) + "%";
             cEl.innerText = cGrams.toFixed(2) + "g";
 
-            pGeometry.attributes.position.needsUpdate = true;
-
             renderer.render(scene, camera);
         }
 
+        // Evento do botão HUD
         document.getElementById('trigger-pulse').addEventListener('click', () => {
-            co2Lvl += 50;
-            for(let i=0; i<particleCount; i++) {
-                if(positions[i*3+1] < 0) {
-                    resetParticle(i);
+            co2Lvl += 60;
+            molecules.forEach(mol => {
+                if (mol.position.y < 0) {
+                    initMolecule(mol);
                 }
-            }
+            });
         });
 
+        // Ajuste de Janela Dinâmico
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
